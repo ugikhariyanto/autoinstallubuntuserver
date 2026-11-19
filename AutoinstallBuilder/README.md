@@ -16,14 +16,25 @@ ISO yang Anda pilih, jadi tidak terikat satu versi tertentu.
 
 ## 1. Kebutuhan
 
-- Windows 10/11 (PowerShell 5.1 sudah tersedia bawaan).
-- Ruang disk kosong minimal **2x ukuran ISO** (ISO sumber + ISO hasil).
+- Windows 10/11 **64-bit** (PowerShell 5.1 dan WinForms sudah tersedia bawaan).
+- Ruang disk kosong minimal **2x ukuran ISO** (ISO sumber + ISO hasil); untuk ISO
+  3,8 GB sediakan ±8 GB agar tidak gagal di tengah proses.
 - ISO Ubuntu Server asli, misalnya:
   - `ubuntu-24.04.5-live-server-amd64.iso`
   - `ubuntu-26.04.1-live-server-amd64.iso`
 - Tidak perlu Python, tidak perlu WSL, tidak perlu Linux.
+- Tidak perlu internet saat build (xorriso sudah disertakan di `tools\xorriso`).
 
-`xorriso` sudah disertakan di folder `tools\xorriso`.
+`xorriso` sudah disertakan di folder `tools\xorriso` (versi 1.5.6, 64-bit).
+
+> **Penting:** jangan memisahkan `UbuntuAutoinstallBuilder.ps1` dari folder
+> `tools\`. Aplikasi mencari xorriso relatif terhadap lokasi skrip; kalau folder
+> `tools` tidak ada, build berhenti dengan pesan
+> `xorriso tidak ditemukan: ... Pastikan folder 'tools' ikut tersalin.`
+
+> **Antivirus / SmartScreen:** `xorriso.exe` adalah biner pihak ketiga yang
+> tidak bertanda tangan, kadang dikarantina. Jika build gagal dengan pesan
+> xorriso hilang padahal file ada, kecualikan folder aplikasi di antivirus.
 
 ---
 
@@ -155,6 +166,9 @@ Opsi lain: `-NoSsh`, `-NoNetplanFix`, `-NoVerify`, `-NoSsh` dsb.
 | Instalasi berhenti di prompt/akhir | Cek layar (bila ada) atau log; penyebab umum: disk target tidak cocok, atau `netplan apply` tanpa workaround. |
 | Mesin tidak boot dari USB | Flash ulang dengan Rufus mode **DD**; pastikan Secure Boot tidak menghalangi (ISO Ubuntu ditandatangani, umumnya aman). |
 | SSH tidak bisa login | Pastikan opsi SSH tercentang; cek `/etc/ssh/sshd_config.d/99-autoinstall.conf` di sistem hasil. |
+| Skrip ditolak walau sudah `-ExecutionPolicy Bypass` | Komputer memakai kebijakan GPO/AppLocker yang mematikan skrip. Perlu izin admin. |
+| `xorriso.exe` hilang / diblokir setelah extract ZIP | File dari internet ditandai Windows. Klik kanan ZIP → Properties → **Unblock**, lalu extract ulang; atau pakai `git clone`. |
+| xorriso tidak bisa jalan sama sekali | Pastikan Windows 64-bit; biner yang disertakan adalah 64-bit. |
 
 ---
 
@@ -180,3 +194,55 @@ AutoinstallBuilder\
   terpercaya dan segera ganti setelah instalasi.
 - Server hasil instalasi memakai DHCP dan mengizinkan login SSH password sesuai
   pilihan Anda. Sesuaikan firewall/router bila perlu.
+
+---
+
+## 11. Memakai di komputer lain (clone dari GitHub)
+
+Repo: `https://github.com/ugikhariyanto/autoinstallubuntuserver`
+
+```bat
+git clone https://github.com/ugikhariyanto/autoinstallubuntuserver.git
+cd autoinstallubuntuserver\AutoinstallBuilder
+Jalankan.bat
+```
+
+Hasil clone berisi 23 file (±9,8 MB) termasuk `tools\xorriso` lengkap dengan
+DLL-nya, jadi tidak ada unduhan tambahan saat build. Tidak ada path absolut
+komputer pembuat yang tertanam di skrip; semua path diambil dari dialog.
+
+### Yang sudah diuji dari hasil clone
+
+| Bagian | Status |
+|---|---|
+| xorriso bawaan repo berjalan | OK (GNU xorriso 1.5.6, 64-bit) |
+| Skrip di-parse PowerShell | OK |
+| Hash password SHA-512 terhadap vektor resmi | OK |
+| Baca ISO 24.04 + ekstrak `grub.cfg` | OK |
+| Patch parameter `autoinstall` | OK |
+| Resep boot 24.04 (20 baris / 61 token) | OK, tanpa error "not a known command" |
+| GUI terbentuk (3 tab) | OK |
+
+### Kondisi yang harus dipenuhi
+
+1. Windows 10/11 64-bit, PowerShell 5.1 (bawaan).
+2. Ruang disk ±8 GB untuk ISO 3,8 GB.
+3. ISO Ubuntu Server asli tersedia sendiri (tidak ikut repo karena `*.iso`
+   di-`gitignore`).
+4. Folder `tools\` tetap satu paket dengan skrip.
+
+### Yang bisa menggagalkan (bukan bug aplikasi)
+
+| Risiko | Gejala | Solusi |
+|---|---|---|
+| Antivirus / SmartScreen | `xorriso.exe` dikarantina | Kecualikan folder aplikasi, atau izinkan file |
+| Unduh sebagai ZIP | File diblokir Windows | Klik kanan ZIP → Properties → **Unblock**, lalu extract |
+| GPO/AppLocker kantor | Skrip PowerShell ditolak | Minta admin mengizinkan eksekusi skrip |
+| Windows 32-bit | xorriso tidak jalan | Gunakan Windows 64-bit |
+| Disk hampir penuh | Build gagal saat menulis ISO (`xorriso` kehabisan ruang) | Sediakan ±8 GB kosong |
+| Clone lama (riwayat sudah ditulis ulang) | `git pull` bentrok | `git fetch origin && git reset --hard origin/main` |
+
+### Kalau terjadi error
+
+Jalankan `Jalankan-Debug.bat`, lalu lihat tab **Log**. Pesan errornya spesifik
+(nama file, path, atau perintah xorriso yang ditolak), sehingga mudah dilacak.
