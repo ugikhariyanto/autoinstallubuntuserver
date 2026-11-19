@@ -1,0 +1,63 @@
+# ============================================================================
+#  Ubuntu Server 26.04.1 LTS - konfigurasi autoinstall (unattended install)
+# ============================================================================
+#  File ini HARUS berada di root media instalasi (satu folder dengan "casper").
+#  Di ISO ini sudah ditanam di "/autoinstall.yaml".
+#
+#  Referensi: https://canonical-subiquity.readthedocs-hosted.com/en/latest/reference/autoinstall-reference.html
+# ============================================================================
+version: 1
+
+locale: en_US.UTF-8
+keyboard:
+  layout: us
+timezone: Asia/Jakarta
+
+# --- Akun utama -------------------------------------------------------------
+# password disimpan sebagai hash SHA-512 crypt(3), bukan plaintext.
+# Untuk membuat hash baru: python hash-password.py
+identity:
+  realname: ugik
+  username: ugik
+  hostname: home-server
+  password: "$6$oB18rEfmJ/kzz6Sh$cbpPXPVVVw1i8f4Y4vEyLA61ly95dEskYLfLGspoTCxl2bg/dEkF0bjImQSHNd6SImVwAbwl/ms7dwi5aIgqK."
+
+# --- SSH --------------------------------------------------------------------
+ssh:
+  install-server: true
+  allow-pw: true
+
+# --- Storage ----------------------------------------------------------------
+# "direct" = partisi biasa (GPT + ext4), paling simpel & mudah dirawat.
+# match.size=largest -> otomatis pilih disk terbesar (media instalasi
+# USB tidak akan pernah dipilih oleh selector ini).
+storage:
+  layout:
+    name: direct
+    match:
+      size: largest
+
+# --- Setelah selesai: matikan mesin, jangan reboot --------------------------
+# Tujuannya supaya USB installer tidak ter-boot lagi dan menginstal ulang.
+shutdown: poweroff
+
+# --- Pengaman sebelum konfigurasi diterapkan --------------------------------
+# Di beberapa lingkungan (VM/QEMU) `netplan apply` di live session bisa gagal
+# dengan "Call failed: Connection timed out" (D-Bus ke systemd-networkd).
+# Dalam mode autoinstall, kegagalan itu membuat subiquity MEMBATALKAN seluruh
+# instalasi dan berhenti di shell. Live session sudah punya jaringan dari
+# casper, dan konfigurasi netplan untuk sistem terpasang ditulis terpisah dari
+# model, jadi melewati `netplan apply` di live session aman: hasil instalasi
+# tidak terpengaruh. (Skrip ini hanya menyentuh live session, bukan /target.)
+early-commands:
+  - bash -c 'if [ -x /usr/sbin/netplan ]; then mv /usr/sbin/netplan /usr/sbin/netplan.real; { echo "#!/bin/sh"; echo "exit 0"; } > /usr/sbin/netplan; chmod 755 /usr/sbin/netplan; fi'
+
+late-commands:
+  # Pastikan login SSH dengan password tetap diizinkan.
+  - bash -c 'mkdir -p /target/etc/ssh/sshd_config.d && printf "%s\n" "PasswordAuthentication yes" > /target/etc/ssh/sshd_config.d/99-autoinstall.conf'
+  - chmod 644 /target/etc/ssh/sshd_config.d/99-autoinstall.conf
+  - curtin in-target -- systemctl enable ssh
+
+# Kalau instalasi gagal, simpan log ke disk target (kalau /target ter-mount).
+error-commands:
+  - bash -c 'tar -czf /target/var/log/installer-logs.tar.gz /var/log/installer 2>/dev/null || true'

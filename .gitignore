@@ -1,0 +1,11 @@
+# File ISO besar (jangan di-commit)
+*.iso
+*.ISO
+
+# Profil aplikasi (berisi path lokal)
+AutoinstallBuilder/profiles/
+
+# Artefak folder aneh buatan xorriso/cygwin (dulu pernah muncul sebagai "C:")
+C/
+# Biner xorriso pihak ketiga (salinan lama; skrip build-iso.ps1 mengunduh sendiri)
+autoinstall/tools/
